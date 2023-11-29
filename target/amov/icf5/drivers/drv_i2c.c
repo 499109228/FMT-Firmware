@@ -232,6 +232,11 @@ static struct rt_i2c_device i2c0_dev1 = {
     .flags = 0
 };
 
+static struct rt_i2c_device i2c0_dev2 = {
+    .slave_addr = 0x0E, /* IST8310 7 bit address */
+    .flags = 0
+};
+
 rt_err_t drv_i2c_init(void)
 {
     /* i2c low-level initialization */
@@ -242,9 +247,8 @@ rt_err_t drv_i2c_init(void)
 
     /* attach i2c devices */
     RT_TRY(rt_i2c_bus_attach_device(&i2c0_dev0, "i2c0_dev0", "i2c0", RT_NULL));
-
-    /* attach i2c devices */
     RT_TRY(rt_i2c_bus_attach_device(&i2c0_dev1, "i2c0_dev1", "i2c0", RT_NULL));
+    RT_TRY(rt_i2c_bus_attach_device(&i2c0_dev2, "i2c0_dev2", "i2c0", RT_NULL));
 
     return RT_EOK;
 }

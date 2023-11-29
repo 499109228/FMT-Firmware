@@ -47,3 +47,11 @@ void icm42688_rotate_to_frd(float* data, uint32_t dev_id)
     data[0] = -data[1];
     data[1] = tmp;
 }
+
+void ist8310_rotate_to_frd(float* data)
+{
+    float tmp;
+    tmp = data[0];
+    data[0] = -data[1];
+    data[1] = tmp;
+}

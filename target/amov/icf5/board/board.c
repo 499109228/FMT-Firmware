@@ -30,10 +30,12 @@
 #include "driver/imu/icm20948.h"
 #include "driver/imu/icm42688p.h"
 #include "driver/mag/bmm150.h"
+#include "driver/mag/ist8310.h"
 #include "driver/mtd/w25qxx.h"
 #include "driver/rgb_led/aw2023.h"
 #include "driver/uwb/nlink_linktrack/nlink_linktrack.h"
 #include "driver/vision_flow/mtf_01.h"
+#include "driver/vision_flow/up_t2.h"
 #include "drv_adc.h"
 #include "drv_buzzer.h"
 #include "drv_gpio.h"
@@ -67,6 +69,7 @@
 #include "module/toml/toml.h"
 #include "module/utils/devmq.h"
 #include "module/workqueue/workqueue_manager.h"
+
 
 #ifdef FMT_USING_SIH
     #include "model/plant/plant_interface.h"
@@ -150,12 +153,12 @@ static void bsp_show_information(void)
 
 static fmt_err_t bsp_parse_toml_sysconfig(toml_table_t* root_tab)
 {
-    fmt_err_t err = FMT_EOK;
+    fmt_err_t     err = FMT_EOK;
     toml_table_t* sub_tab;
-    const char* key;
-    const char* raw;
-    char* target;
-    int i;
+    const char*   key;
+    const char*   raw;
+    char*         target;
+    int           i;
 
     if (root_tab == NULL) {
         return FMT_ERROR;
@@ -208,9 +211,9 @@ static fmt_err_t bsp_parse_toml_sysconfig(toml_table_t* root_tab)
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
     printf("Enter Error_Handler\n");
@@ -319,10 +322,15 @@ void bsp_initialize(void)
     /* init onboard sensors */
     RT_CHECK(drv_bmi088_init("spi0_dev1", "spi0_dev0", "gyro0", "accel0", 0));
     // RT_CHECK(drv_icm42688_init("spi0_dev4", "gyro1", "accel1", 0));
-    RT_CHECK(drv_bmm150_init("spi0_dev2", "mag0"));
+    // RT_CHECK(drv_bmm150_init("spi0_dev2", "mag0"));
     RT_CHECK(drv_spl06_init("spi0_dev3", "barometer"));
 
-    drv_mtf_01_init("serial3");
+    if (drv_ist8310_init("i2c0_dev2", "mag0") != RT_EOK) {
+        RT_CHECK(drv_bmm150_init("spi0_dev2", "mag0"));
+        printf("external mag init failed, use onboard mag!\n");
+    }
+
+    drv_up_t2_init("serial3");
     // drv_nlink_linktrack_init("serial4");
     RT_CHECK(gps_ubx_init("serial4", "gps"));
 
