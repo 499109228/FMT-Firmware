@@ -81,7 +81,7 @@ static int16_t up_parse_char(uint8_t ch)
         }
         break;
     case UP_DATA:
-        ((uint8_t *)&up_data)[cnt++] = ch;
+        ((uint8_t*)&up_data)[cnt++] = ch;
         xor_calc ^= ch;
         if (cnt >= 10) {
             state = UP_CHECK;
@@ -108,10 +108,12 @@ static int16_t up_parse_char(uint8_t ch)
 
 static void thread_entry(void* args)
 {
-    rt_err_t    res;
-    rt_uint32_t recv_set = 0;
-    rt_uint32_t wait_set = EVENT_UP_T2_UPDATE;
-    uint8_t     c;
+    rt_err_t        res;
+    rt_uint32_t     recv_set = 0;
+    rt_uint32_t     wait_set = EVENT_UP_T2_UPDATE;
+    uint8_t         c;
+    // static int16_t  prev_flow_x_int, prev_flow_y_int;
+    // static uint32_t prev_time;
 
     /* open device */
     if (rt_device_open(dev, RT_DEVICE_OFLAG_RDONLY | RT_DEVICE_FLAG_INT_RX) != RT_EOK) {
@@ -129,27 +131,37 @@ static void thread_entry(void* args)
                 if (up_parse_char(c) >= 0) {
                     uint32_t time_now = systime_now_ms();
 
-                    printf("dis:%d\n", up_data.distance_mm);
+                    // printf("dis:%d\n", up_data.distance_mm);
 
                     rf_report.timestamp_ms      = time_now;
                     optflow_report.timestamp_ms = time_now;
 
                     if (up_data.tof_confidence >= 50) {
                         rf_report.distance_m = up_data.distance_mm * 0.001f;
+
+                        /* actual optical flow velocity = raw_vel * distance, we just publish raw data,
+                            leave it to upper layer to handle it. */
+                        optflow_report.vx_mPs  = -100.0f * up_data.flow_y_int / up_data.timespan_us;
+                        optflow_report.vy_mPs  = 100.0f * up_data.flow_x_int / up_data.timespan_us;
+                        optflow_report.quality = up_data.flow_valid == 0xF5 ? 100 : 0;
                     } else {
                         /* negative value indicate range finder invalid */
                         rf_report.distance_m = -1;
-                    }
 
-                    /* actual optical flow velocity = raw_vel * distance, we just publish raw data,
-                           leave it to upper layer to handle it. */
-                    optflow_report.vx_mPs  = -data.vy * 0.01f;
-                    optflow_report.vy_mPs  = data.vx * 0.01f;
-                    optflow_report.quality = data.quality * data.status;
+                        optflow_report.vx_mPs  = 0;
+                        optflow_report.vy_mPs  = 0;
+                        optflow_report.quality = 0;
+                    }
 
                     /* publish mtf_01 data */
                     mcn_publish(MCN_HUB(sensor_optflow), &optflow_report);
                     mcn_publish(MCN_HUB(sensor_rangefinder), &rf_report);
+
+                    // prev_flow_x_int = up_data.flow_x_int;
+                    // prev_flow_y_int = up_data.flow_y_int;
+                    // prev_time       = time_now;
+
+                    // printf("%d %d, %d\n", -up_data.flow_y_int, up_data.flow_x_int, up_data.timespan_us);
                 }
             }
         }
