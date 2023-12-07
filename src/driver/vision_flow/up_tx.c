@@ -14,13 +14,16 @@
  * limitations under the License.
  *****************************************************************************/
 
+// This driver apply for upixel optical_flow and rangefinder module up-t1, up-t1 plus and up-t2 with UP protocol
+
 #include <firmament.h>
 
+#include "hal/serial/serial.h"
 #include "module/sensor/sensor_hub.h"
 #include "module/workqueue/workqueue_manager.h"
 
-#define EVENT_UP_T2_UPDATE (1 << 0)
-#define DATA_SIZE          sizeof(up_t2_data)
+#define EVENT_UP_TX_UPDATE (1 << 0)
+#define DATA_SIZE          sizeof(up_tx_data)
 
 MCN_DECLARE(sensor_optflow);
 MCN_DECLARE(sensor_rangefinder);
@@ -40,12 +43,12 @@ typedef struct {
     uint16_t distance_mm;
     uint8_t  flow_valid;
     uint8_t  tof_confidence;
-} up_t2_data;
+} up_tx_data;
 
 static rt_device_t     dev;
 static rt_thread_t     thread;
 static struct rt_event event;
-static up_t2_data      up_data;
+static up_tx_data      up_data;
 static optflow_data_t  optflow_report;
 static rf_data_t       rf_report;
 
@@ -56,7 +59,7 @@ static void start_thread(void* parameter)
 
 static rt_err_t rx_ind_cb(rt_device_t dev, rt_size_t size)
 {
-    return rt_event_send(&event, EVENT_UP_T2_UPDATE);
+    return rt_event_send(&event, EVENT_UP_TX_UPDATE);
 }
 
 static int16_t up_parse_char(uint8_t ch)
@@ -108,16 +111,14 @@ static int16_t up_parse_char(uint8_t ch)
 
 static void thread_entry(void* args)
 {
-    rt_err_t        res;
-    rt_uint32_t     recv_set = 0;
-    rt_uint32_t     wait_set = EVENT_UP_T2_UPDATE;
-    uint8_t         c;
-    // static int16_t  prev_flow_x_int, prev_flow_y_int;
-    // static uint32_t prev_time;
+    rt_err_t    res;
+    rt_uint32_t recv_set = 0;
+    rt_uint32_t wait_set = EVENT_UP_TX_UPDATE;
+    uint8_t     c;
 
     /* open device */
     if (rt_device_open(dev, RT_DEVICE_OFLAG_RDONLY | RT_DEVICE_FLAG_INT_RX) != RT_EOK) {
-        printf("up-02 fail to open device!\n");
+        printf("up-tx fail to open device!\n");
         return;
     }
 
@@ -125,13 +126,10 @@ static void thread_entry(void* args)
         /* wait event occur */
         res = rt_event_recv(&event, wait_set, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, 10, &recv_set);
 
-        if ((res == RT_EOK && (recv_set & EVENT_UP_T2_UPDATE)) || res == -RT_ETIMEOUT) {
+        if ((res == RT_EOK && (recv_set & EVENT_UP_TX_UPDATE)) || res == -RT_ETIMEOUT) {
             while (rt_device_read(dev, 0, &c, 1) > 0) {
-                // printf("%x,", c);
                 if (up_parse_char(c) >= 0) {
                     uint32_t time_now = systime_now_ms();
-
-                    // printf("dis:%d\n", up_data.distance_mm);
 
                     rf_report.timestamp_ms      = time_now;
                     optflow_report.timestamp_ms = time_now;
@@ -156,12 +154,6 @@ static void thread_entry(void* args)
                     /* publish mtf_01 data */
                     mcn_publish(MCN_HUB(sensor_optflow), &optflow_report);
                     mcn_publish(MCN_HUB(sensor_rangefinder), &rf_report);
-
-                    // prev_flow_x_int = up_data.flow_x_int;
-                    // prev_flow_y_int = up_data.flow_y_int;
-                    // prev_time       = time_now;
-
-                    // printf("%d %d, %d\n", -up_data.flow_y_int, up_data.flow_x_int, up_data.timespan_us);
                 }
             }
         }
@@ -169,23 +161,33 @@ static void thread_entry(void* args)
 }
 
 static struct WorkItem work_item = {
-    .name          = "up-02",
+    .name          = "up-tx",
     .period        = 0,
     .schedule_time = 1000,
     .run           = start_thread
 };
 
-rt_err_t drv_up_t2_init(const char* uart_dev_name)
+rt_err_t drv_up_tx_init(const char* uart_dev_name)
 {
     dev = rt_device_find(uart_dev_name);
 
     RT_ASSERT(dev != NULL);
 
-    thread = rt_thread_create("up-02", thread_entry, RT_NULL, 2 * 1024, 7, 1);
+    serial_dev_t serial_dev = (serial_dev_t)dev;
+    /* console device configuration */
+    struct serial_configure pconfig = serial_dev->config;
+    /* the default baudrate for up-tx device is 115200 */
+    pconfig.baud_rate = 115200;
+    if (rt_device_control(&serial_dev->parent, RT_DEVICE_CTRL_CONFIG, &pconfig) != RT_EOK) {
+        printf("fail to config uptx baudrate\n");
+        return RT_ERROR;
+    }
+
+    thread = rt_thread_create("up-tx", thread_entry, RT_NULL, 2 * 1024, 7, 1);
 
     RT_ASSERT(thread != NULL);
 
-    RT_CHECK(rt_event_init(&event, "up-02", RT_IPC_FLAG_FIFO));
+    RT_CHECK(rt_event_init(&event, "up-tx", RT_IPC_FLAG_FIFO));
 
     RT_CHECK(rt_device_set_rx_indicate(dev, rx_ind_cb));
 

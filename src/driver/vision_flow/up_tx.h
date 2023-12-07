@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *****************************************************************************/
-#ifndef UP_T2_H__
-#define UP_T2_H__
+#ifndef UP_TX_H__
+#define UP_TX_H__
 
 #include <rtthread.h>
 
@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-rt_err_t drv_up_t2_init(const char* uart_dev_name);
+rt_err_t drv_up_tx_init(const char* uart_dev_name);
 
 #ifdef __cplusplus
 }

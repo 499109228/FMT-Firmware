@@ -35,7 +35,7 @@
 #include "driver/rgb_led/aw2023.h"
 #include "driver/uwb/nlink_linktrack/nlink_linktrack.h"
 #include "driver/vision_flow/mtf_01.h"
-#include "driver/vision_flow/up_t2.h"
+#include "driver/vision_flow/up_tx.h"
 #include "drv_adc.h"
 #include "drv_buzzer.h"
 #include "drv_gpio.h"
@@ -69,7 +69,6 @@
 #include "module/toml/toml.h"
 #include "module/utils/devmq.h"
 #include "module/workqueue/workqueue_manager.h"
-
 
 #ifdef FMT_USING_SIH
     #include "model/plant/plant_interface.h"
@@ -330,7 +329,8 @@ void bsp_initialize(void)
         printf("external mag init failed, use onboard mag!\n");
     }
 
-    drv_up_t2_init("serial3");
+    // drv_up_tx_init("serial3");
+    drv_mtf_01_init("serial3");
     // drv_nlink_linktrack_init("serial4");
     RT_CHECK(gps_ubx_init("serial4", "gps"));
 
