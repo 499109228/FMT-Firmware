@@ -44,6 +44,7 @@
 #include "drv_systick.h"
 #include "drv_usart.h"
 #include "drv_usbd_cdc.h"
+#include "drv_can.h"
 #include "led.h"
 
 #include "default_config.h"
@@ -380,6 +381,8 @@ void bsp_early_initialize(void)
 
     /* pwm driver init */
     RT_CHECK(drv_pwm_init());
+
+    drv_can_init();
 
     /* system statistic module */
     FMT_CHECK(sys_stat_init());
