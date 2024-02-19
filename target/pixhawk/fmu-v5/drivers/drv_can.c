@@ -15,36 +15,53 @@
  *****************************************************************************/
 
 #include <firmament.h>
+#include <string.h>
 
-#include "board.h"
 #include "drv_can.h"
 #include "hal/can/can.h"
 #include "stm32f7xx_hal_can.h"
 
+struct can_data {
+    CAN_HandleTypeDef   hcan;
+    CAN_FilterTypeDef   filter;
+    CAN_TxHeaderTypeDef tx_header;
+    CAN_RxHeaderTypeDef rx_header;
+    uint8_t             tx_data[8];
+    uint8_t             rx_data[8];
+    uint32_t            tx_mailbox;
+} can1_data;
 
-CAN_HandleTypeDef hcan1;
-CAN_FilterTypeDef sFilterConfig;
+// static uint8_t tx_cplt;
 
-CAN_TxHeaderTypeDef TxHeader;
-CAN_RxHeaderTypeDef RxHeader;
-uint8_t             TxData[8];
-uint8_t             RxData[8] = { 0 };
-uint32_t            TxMailbox;
+static rt_err_t can_config(can_dev_t can, struct can_configure* cfg);
+static rt_err_t can_control(can_dev_t can, int cmd, void* arg);
+static int      can_sendmsg(can_dev_t can, const can_msg_t msg);
+static int      can_recvmsg(can_dev_t can, can_msg_t msg);
 
-static uint8_t tx_cplt;
+const static struct can_ops can1_dev_ops = {
+    .configure = can_config,
+    .control   = can_control,
+    .sendmsg   = can_sendmsg,
+    .recvmsg   = can_recvmsg
+};
+
+static can_device can1_dev = {
+    .ops    = &can1_dev_ops,
+    .config = CAN_DEFAULT_CONFIG,
+};
 
 /**
  * @brief This function handles CAN1 TX interrupts.
  */
 void CAN1_TX_IRQHandler(void)
 {
-    /* USER CODE BEGIN CAN1_TX_IRQn 0 */
-    // printf("CAN1_TX_IRQHandler\n");
-    /* USER CODE END CAN1_TX_IRQn 0 */
-    HAL_CAN_IRQHandler(&hcan1);
-    /* USER CODE BEGIN CAN1_TX_IRQn 1 */
+    /* enter interrupt */
+    rt_interrupt_enter();
 
-    /* USER CODE END CAN1_TX_IRQn 1 */
+    HAL_CAN_IRQHandler(&can1_data.hcan);
+
+    /* leave interrupt */
+    rt_interrupt_leave();
 }
 
 /**
@@ -52,35 +69,56 @@ void CAN1_TX_IRQHandler(void)
  */
 void CAN1_RX0_IRQHandler(void)
 {
-    /* USER CODE BEGIN CAN1_RX0_IRQn 0 */
-    // printf("CAN1_RX0_IRQHandler\n");
-    /* USER CODE END CAN1_RX0_IRQn 0 */
-    HAL_CAN_IRQHandler(&hcan1);
-    /* USER CODE BEGIN CAN1_RX0_IRQn 1 */
+    /* enter interrupt */
+    rt_interrupt_enter();
 
-    /* USER CODE END CAN1_RX0_IRQn 1 */
+    HAL_CAN_IRQHandler(&can1_data.hcan);
+
+    /* leave interrupt */
+    rt_interrupt_leave();
 }
 
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef* hcan)
 {
-    printf("can1 tx complete!\n");
-    tx_cplt = 1;
+    if (hcan->Instance == CAN1) {
+        printf("can1 tx complete!\n");
+        hal_can_notify(&can1_dev, CAN_EVENT_TX_DONE, RT_NULL);
+    } else if (hcan->Instance == CAN2) {
+        // TODO can2
+        printf("can2 tx complete!\n");
+    } else {
+        /* do nothing */
+        printf("canXXX tx complete!\n");
+    }
 }
 
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
 {
-    printf("can1 rx pending!\n");
-    // // uint8_t RXmessage[8];
-    // // CAN_RxHeaderTypeDef RXHeader;
+    can_msg msg;
 
     if (hcan->Instance == CAN1) {
-        HAL_CAN_GetRxMessage(hcan, CAN_FILTER_FIFO0, &RxHeader, RxData); // 获取数据
+        printf("can1 rx pending!\n");
+
+        if (HAL_CAN_GetRxMessage(hcan, CAN_FILTER_FIFO0, &can1_data.rx_header, can1_data.rx_data) != HAL_OK)
+            return;
+
+        msg.std_id = can1_data.rx_header.StdId;
+        msg.ext_id = can1_data.rx_header.ExtId;
+        msg.IDE    = can1_data.rx_header.IDE;
+        msg.RTR    = can1_data.rx_header.RTR;
+        msg.DLC    = can1_data.rx_header.DLC;
+        memcpy(msg.data, can1_data.rx_data, sizeof(msg.data));
+
+        hal_can_notify(&can1_dev, CAN_EVENT_RX_IND, &msg);
+    } else if (hcan->Instance == CAN2) {
+        printf("can2 rx pending!\n");
+    } else {
+        printf("canXXX rx pending!\n");
     }
 }
 
 void HAL_CAN_MspInit(CAN_HandleTypeDef* canHandle)
 {
-
     GPIO_InitTypeDef GPIO_InitStruct = { 0 };
     if (canHandle->Instance == CAN1) {
         /* USER CODE BEGIN CAN1_MspInit 0 */
@@ -116,13 +154,22 @@ void HAL_CAN_MspInit(CAN_HandleTypeDef* canHandle)
         HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
         /* USER CODE BEGIN CAN1_MspInit 1 */
 
+        /* Set silent pin to low to activate can transceiver */
+        GPIO_InitStruct.Pin       = GPIO_PIN_2;
+        GPIO_InitStruct.Mode      = GPIO_MODE_OUTPUT_PP;
+        GPIO_InitStruct.Pull      = GPIO_NOPULL;
+        GPIO_InitStruct.Speed     = GPIO_SPEED_FREQ_VERY_HIGH;
+        // GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
+        HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
+
+        HAL_GPIO_WritePin(GPIOH, GPIO_PIN_2, GPIO_PIN_RESET);
+
         /* USER CODE END CAN1_MspInit 1 */
     }
 }
 
 void HAL_CAN_MspDeInit(CAN_HandleTypeDef* canHandle)
 {
-
     if (canHandle->Instance == CAN1) {
         /* USER CODE BEGIN CAN1_MspDeInit 0 */
 
@@ -147,121 +194,151 @@ void HAL_CAN_MspDeInit(CAN_HandleTypeDef* canHandle)
     }
 }
 
-static rt_err_t can1_config(can_dev_t can, struct can_configure* cfg)
+static rt_err_t can_config(can_dev_t can, struct can_configure* cfg)
 {
-    /*##-1- Configure the CAN peripheral #######################################*/
-    hcan1.Instance                  = CAN1;
-    hcan1.Init.Prescaler            = 6;
-    hcan1.Init.Mode                 = CAN_MODE_LOOPBACK;
-    hcan1.Init.SyncJumpWidth        = CAN_SJW_1TQ;
-    hcan1.Init.TimeSeg1             = CAN_BS1_5TQ;
-    hcan1.Init.TimeSeg2             = CAN_BS2_3TQ;
-    hcan1.Init.TimeTriggeredMode    = DISABLE;
-    hcan1.Init.AutoBusOff           = DISABLE;
-    hcan1.Init.AutoWakeUp           = DISABLE;
-    hcan1.Init.AutoRetransmission   = DISABLE;
-    hcan1.Init.ReceiveFifoLocked    = DISABLE;
-    hcan1.Init.TransmitFifoPriority = DISABLE;
-    if (HAL_CAN_Init(&hcan1) != HAL_OK) {
-        return RT_ERROR;
-    }
+    RT_ASSERT(can != RT_NULL);
+    RT_ASSERT(cfg != RT_NULL);
 
-    /*##-2- Configure the CAN Filter ###########################################*/
-    sFilterConfig.FilterBank           = 0;
-    sFilterConfig.FilterMode           = CAN_FILTERMODE_IDMASK;
-    sFilterConfig.FilterScale          = CAN_FILTERSCALE_32BIT;
-    sFilterConfig.FilterIdHigh         = 0x0000;
-    sFilterConfig.FilterIdLow          = 0x0000;
-    sFilterConfig.FilterMaskIdHigh     = 0x0000;
-    sFilterConfig.FilterMaskIdLow      = 0x0000;
-    sFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
-    sFilterConfig.FilterActivation     = ENABLE;
-    sFilterConfig.SlaveStartFilterBank = 14;
-    if (HAL_CAN_ConfigFilter(&hcan1, &sFilterConfig) != HAL_OK) {
-        return RT_ERROR;
-    }
+    if (can == &can1_dev) {
+        /* Configure the CAN peripheral */
+        can1_data.hcan.Instance                  = CAN1;
+        can1_data.hcan.Init.Prescaler            = 6;
+        can1_data.hcan.Init.Mode                 = CAN_MODE_LOOPBACK;
+        // can1_data.hcan.Init.Mode                 = CAN_MODE_NORMAL;
+        can1_data.hcan.Init.SyncJumpWidth        = CAN_SJW_1TQ;
+        can1_data.hcan.Init.TimeSeg1             = CAN_BS1_5TQ;
+        can1_data.hcan.Init.TimeSeg2             = CAN_BS2_3TQ;
+        can1_data.hcan.Init.TimeTriggeredMode    = DISABLE;
+        can1_data.hcan.Init.AutoBusOff           = DISABLE;
+        can1_data.hcan.Init.AutoWakeUp           = DISABLE;
+        can1_data.hcan.Init.AutoRetransmission   = DISABLE;
+        can1_data.hcan.Init.ReceiveFifoLocked    = DISABLE;
+        can1_data.hcan.Init.TransmitFifoPriority = DISABLE;
+        if (HAL_CAN_Init(&can1_data.hcan) != HAL_OK)
+            return RT_ERROR;
 
-    if (HAL_CAN_ActivateNotification(&hcan1, CAN_IT_TX_MAILBOX_EMPTY | CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
-        return RT_ERROR;
-    }
+        /* Configure the CAN filter */
+        can1_data.filter.FilterBank           = 0;
+        can1_data.filter.FilterMode           = CAN_FILTERMODE_IDMASK;
+        can1_data.filter.FilterScale          = CAN_FILTERSCALE_32BIT;
+        can1_data.filter.FilterIdHigh         = 0x0000;
+        can1_data.filter.FilterIdLow          = 0x0000;
+        can1_data.filter.FilterMaskIdHigh     = 0x0000;
+        can1_data.filter.FilterMaskIdLow      = 0x0000;
+        can1_data.filter.FilterFIFOAssignment = CAN_RX_FIFO0;
+        can1_data.filter.FilterActivation     = ENABLE;
+        can1_data.filter.SlaveStartFilterBank = 14;
+        if (HAL_CAN_ConfigFilter(&can1_data.hcan, &can1_data.filter) != HAL_OK)
+            return RT_ERROR;
 
-    /*##-3- Start the CAN peripheral ###########################################*/
-    if (HAL_CAN_Start(&hcan1) != HAL_OK) {
-        printf("fail 2\n");
-        // return 0;
+        /* Acticate TX/RX interrupt */
+        if (HAL_CAN_ActivateNotification(&can1_data.hcan, CAN_IT_TX_MAILBOX_EMPTY | CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
+            return RT_ERROR;
     }
 
     return RT_EOK;
 }
 
-void can1_test(void)
+static rt_err_t can_control(can_dev_t can, int cmd, void* arg)
 {
-    uint32_t ier_reg = READ_REG(hcan1.Instance->IER);
-    printf("IER:0x%x\n", ier_reg);
+    RT_ASSERT(can != RT_NULL);
 
-    /*##-4- Start the Transmission process #####################################*/
-    TxHeader.StdId              = 0x17;
-    TxHeader.RTR                = CAN_RTR_DATA;
-    TxHeader.IDE                = CAN_ID_STD;
-    TxHeader.DLC                = 2;
-    TxHeader.TransmitGlobalTime = DISABLE;
-    TxData[0]                   = 0xCA;
-    TxData[1]                   = 0xFE;
+    struct can_data* data = (struct can_data*)can->parent.user_data;
 
-    /* Request transmission */
-    if (HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK) {
-        printf("fail 3\n");
-        return;
+    switch (cmd) {
+    case CAN_OPEN_DEVICE:
+        if (HAL_CAN_Start(&data->hcan) != HAL_OK)
+            return RT_ERROR;
+        break;
+
+    case CAN_CLOSE_DEVICE:
+        if (HAL_CAN_Stop(&data->hcan) != HAL_OK)
+            return RT_ERROR;
+        break;
+
+    default:
+        break;
     }
 
-    /* Wait transmission complete */
-    // while(HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) != 3) {}
-    while (tx_cplt == 0)
-        ;
-    tx_cplt = 0;
-
-    /*##-5- Start the Reception process ########################################*/
-    // if(HAL_CAN_GetRxFifoFillLevel(&hcan1, CAN_RX_FIFO0) != 1)
-    // {
-    //   printf("fail 4\n");
-    //   return;
-    // }
-
-    // if(HAL_CAN_GetRxMessage(&hcan1, CAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
-    // {
-    //   printf("fail 5\n");
-    //   return;
-    // }
-
-    if ((RxHeader.StdId != 0x17) || (RxHeader.RTR != CAN_RTR_DATA) || (RxHeader.IDE != CAN_ID_STD) || (RxHeader.DLC != 2) || ((RxData[0] << 8 | RxData[1]) != 0xCAFE)) {
-        printf("rx message error\n");
-        return;
-    }
-
-    printf("can test pass! id:%x\n", RxHeader.StdId);
+    return RT_EOK;
 }
 
-// const static struct can_ops can1_dev_ops = {
-//     .configure = can1_config,
-//     .control = NULL,
-//     .sendmsg = NULL,
-//     .recvmsg = NULL
-// };
+static int can_sendmsg(can_dev_t can, const can_msg_t msg)
+{
+    if (can == &can1_dev) {
+        can1_data.tx_header.StdId              = msg->std_id;
+        can1_data.tx_header.ExtId              = msg->ext_id;
+        can1_data.tx_header.IDE                = msg->IDE;
+        can1_data.tx_header.RTR                = msg->RTR;
+        can1_data.tx_header.DLC                = msg->DLC;
+        can1_data.tx_header.TransmitGlobalTime = DISABLE;
+
+        memcpy(can1_data.tx_data, msg->data, 8);
+
+        /* Request transmission */
+        if (HAL_CAN_AddTxMessage(&can1_data.hcan, &can1_data.tx_header, can1_data.tx_data, &can1_data.tx_mailbox) == HAL_OK)
+            return 1;
+    }
+
+    return 0;
+}
+
+static int can_recvmsg(can_dev_t can, can_msg_t msg)
+{
+    if (can == &can1_dev) {
+        if (HAL_CAN_GetRxMessage(&can1_data.hcan, CAN_FILTER_FIFO0, &can1_data.rx_header, can1_data.rx_data) == HAL_OK) {
+            msg->std_id = can1_data.rx_header.StdId;
+            msg->ext_id = can1_data.rx_header.ExtId;
+            msg->IDE    = can1_data.rx_header.IDE;
+            msg->RTR    = can1_data.rx_header.RTR;
+            msg->DLC    = can1_data.rx_header.DLC;
+
+            memcpy(msg->data, can1_data.rx_data, 8);
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+// void can1_test(void)
+// {
+//     uint32_t ier_reg = READ_REG(can1_data.hcan.Instance->IER);
+//     printf("IER:0x%x\n", ier_reg);
+
+//     /*##-4- Start the Transmission process #####################################*/
+//     can1_data.tx_header.StdId              = 0x13;
+//     can1_data.tx_header.RTR                = CAN_RTR_DATA;
+//     can1_data.tx_header.IDE                = CAN_ID_STD;
+//     can1_data.tx_header.DLC                = 2;
+//     can1_data.tx_header.TransmitGlobalTime = DISABLE;
+//     can1_data.tx_data[0]                   = 0xCA;
+//     can1_data.tx_data[1]                   = 0xFE;
+
+//     /* Request transmission */
+//     if (HAL_CAN_AddTxMessage(&can1_data.hcan, &can1_data.tx_header, can1_data.tx_data, &can1_data.tx_mailbox) != HAL_OK) {
+//         printf("fail 3\n");
+//         return;
+//     }
+
+//     /* Wait transmission complete */
+//     // while(HAL_CAN_GetTxMailboxesFreeLevel(&hcan1) != 3) {}
+//     while (tx_cplt == 0)
+//         ;
+//     tx_cplt = 0;
+
+//     if ((can1_data.rx_header.StdId != 0x13) || (can1_data.rx_header.RTR != CAN_RTR_DATA) || (can1_data.rx_header.IDE != CAN_ID_STD) || (can1_data.rx_header.DLC != 2) || ((can1_data.rx_data[0] << 8 | can1_data.rx_data[1]) != 0xCAFE)) {
+//         printf("rx message error\n");
+//         return;
+//     }
+
+//     printf("can test pass! id:%x\n", can1_data.rx_header.StdId);
+// }
 
 rt_err_t drv_can_init(void)
 {
-    // sd0_dev.ops = &dev_ops;
-
-    // if (rt_event_init(&sd0_dev.event, "sdio", RT_IPC_FLAG_FIFO) != RT_EOK) {
-    //     console_printf("fail to init sdio event\n");
-    //     return RT_ERROR;
-    // }
-
-    // return hal_sd_register(&sd0_dev, "sd0", RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_REMOVABLE | RT_DEVICE_FLAG_STANDALONE, &hsd1);
-
-    can1_config(NULL, NULL);
-
-    printf("drv can init finish\n");
+    RT_TRY(hal_can_register(&can1_dev, "can1", RT_DEVICE_FLAG_RDWR | RT_DEVICE_FLAG_INT_RX, &can1_data));
 
     return RT_EOK;
 }

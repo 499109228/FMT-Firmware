@@ -33,9 +33,9 @@ ringbuffer* ringbuffer_create(uint32_t size)
         return NULL;
     }
 
-    rb->size = size;
-    rb->head = 0;
-    rb->tail = 0;
+    rb->size        = size;
+    rb->head        = 0;
+    rb->tail        = 0;
     rb->static_flag = 0;
 
     return rb;
@@ -48,10 +48,10 @@ ringbuffer* ringbuffer_static_create(uint32_t size, uint8_t* buffer)
         return rb;
     }
 
-    rb->buff = buffer;
-    rb->size = size;
-    rb->head = 0;
-    rb->tail = 0;
+    rb->buff        = buffer;
+    rb->size        = size;
+    rb->head        = 0;
+    rb->tail        = 0;
     rb->static_flag = 1;
 
     return rb;
@@ -88,7 +88,7 @@ uint8_t ringbuffer_putc(ringbuffer* rb, uint8_t c)
     }
 
     rb->buff[rb->head] = c;
-    rb->head = (rb->head + 1) % rb->size;
+    rb->head           = (rb->head + 1) % rb->size;
     OS_EXIT_CRITICAL;
 
     return 1;
@@ -99,7 +99,7 @@ uint8_t ringbuffer_getc(ringbuffer* rb)
     uint8_t c;
 
     OS_ENTER_CRITICAL;
-    c = rb->buff[rb->tail];
+    c        = rb->buff[rb->tail];
     rb->tail = (rb->tail + 1) % rb->size;
     OS_EXIT_CRITICAL;
 
@@ -112,11 +112,11 @@ uint32_t ringbuffer_get(ringbuffer* rb, uint8_t* ptr, uint32_t len)
 
     /* check if there are enough data to read */
     buffer_len = ringbuffer_getlen(rb);
-    r_len = buffer_len < len ? buffer_len : len;
+    r_len      = buffer_len < len ? buffer_len : len;
 
     OS_ENTER_CRITICAL;
     for (uint32_t i = 0; i < r_len; i++) {
-        ptr[i] = rb->buff[rb->tail];
+        ptr[i]   = rb->buff[rb->tail];
         rb->tail = (rb->tail + 1) % rb->size;
     }
     OS_EXIT_CRITICAL;
@@ -133,7 +133,9 @@ uint32_t ringbuffer_put(ringbuffer* rb, const uint8_t* ptr, uint32_t len)
     /* check if there are enough space to write */
     buffer_len = ringbuffer_getlen(rb);
     free_space = rb->size - buffer_len;
-    w_len = (len <= free_space) ? len : free_space;
+    w_len      = (len <= free_space) ? len : free_space;
+    if ((rb->head + w_len) % rb->size == rb->tail)
+        return 0;
 
     OS_ENTER_CRITICAL;
     space_to_end = rb->size - rb->head;

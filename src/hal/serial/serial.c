@@ -363,7 +363,7 @@ static rt_err_t hal_serial_open(struct rt_device* dev, rt_uint16_t oflag)
     if ((oflag & RT_DEVICE_FLAG_DMA_TX) && !(dev->flag & RT_DEVICE_FLAG_DMA_TX))
         return -RT_EIO;
 
-    /* get open flags */
+    /* set open flags */
     dev->open_flag = oflag;
 
     /* initialize the Rx/Tx structure according to open flag */
