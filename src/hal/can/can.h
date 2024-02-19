@@ -26,6 +26,9 @@ extern "C" {
 #define CAN_EVENT_RX_IND    0x01 /* Rx indication */
 #define CAN_EVENT_TX_DONE   0x02 /* Tx complete   */
 
+#define CAN_RES_TX_OK       0x1000
+#define CAN_RES_TX_FAIL     0x1001
+
 /* Default config for serial_configure structure */
 #define CAN_DEFAULT_CONFIG                       \
     {                                            \

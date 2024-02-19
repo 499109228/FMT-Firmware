@@ -175,7 +175,7 @@ void hal_can_notify(can_device* can, int event, void* data)
 
         /* notify can message send complete */
         if (can->parent.tx_complete != RT_NULL) {
-            can->parent.tx_complete(&can->parent, (void*)RT_NULL);
+            can->parent.tx_complete(&can->parent, data);
         }
     } break;
 
