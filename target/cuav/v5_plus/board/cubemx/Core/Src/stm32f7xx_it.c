@@ -58,6 +58,7 @@
 /* External variables --------------------------------------------------------*/
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern CAN_HandleTypeDef hcan1;
+extern CAN_HandleTypeDef hcan2;
 extern DMA_HandleTypeDef hdma_sdmmc1_tx;
 extern DMA_HandleTypeDef hdma_sdmmc1_rx;
 extern SD_HandleTypeDef hsd1;
@@ -296,6 +297,34 @@ void DMA2_Stream3_IRQHandler(void)
   /* USER CODE BEGIN DMA2_Stream3_IRQn 1 */
 
   /* USER CODE END DMA2_Stream3_IRQn 1 */
+}
+
+/**
+  * @brief This function handles CAN2 TX interrupts.
+  */
+void CAN2_TX_IRQHandler(void)
+{
+  /* USER CODE BEGIN CAN2_TX_IRQn 0 */
+
+  /* USER CODE END CAN2_TX_IRQn 0 */
+  HAL_CAN_IRQHandler(&hcan2);
+  /* USER CODE BEGIN CAN2_TX_IRQn 1 */
+
+  /* USER CODE END CAN2_TX_IRQn 1 */
+}
+
+/**
+  * @brief This function handles CAN2 RX0 interrupts.
+  */
+void CAN2_RX0_IRQHandler(void)
+{
+  /* USER CODE BEGIN CAN2_RX0_IRQn 0 */
+
+  /* USER CODE END CAN2_RX0_IRQn 0 */
+  HAL_CAN_IRQHandler(&hcan2);
+  /* USER CODE BEGIN CAN2_RX0_IRQn 1 */
+
+  /* USER CODE END CAN2_RX0_IRQn 1 */
 }
 
 /**

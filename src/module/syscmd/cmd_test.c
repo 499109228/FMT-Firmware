@@ -26,7 +26,6 @@ int cmd_test(int argc, char** argv)
     rt_size_t ss;
 
     rt_device_t dev = rt_device_find("can1");
-
     rt_device_open(dev, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
 
     if (argc == 1) {
