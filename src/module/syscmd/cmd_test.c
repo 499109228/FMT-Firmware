@@ -25,7 +25,7 @@ int cmd_test(int argc, char** argv)
     /* add your test code here */
     rt_size_t ss;
 
-    rt_device_t dev = rt_device_find("can1");
+    rt_device_t dev = rt_device_find("can2");
     rt_device_open(dev, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
 
     if (argc == 1) {
@@ -54,7 +54,15 @@ int cmd_test(int argc, char** argv)
 
         printf("recv can\n");
 
-        while (1) {
+        // while (1) {
+        //     ss = rt_device_read(dev, RT_WAITING_FOREVER, &recv_msg, 1);
+        //     printf("read size:%d\n", ss);
+
+        //     printf("id:%x DLC:%d\n", recv_msg.std_id, recv_msg.DLC);
+        //     printf("%x %x %x %x %x %x %x %x\n", recv_msg.data[0], recv_msg.data[1], recv_msg.data[2], recv_msg.data[3], recv_msg.data[4], recv_msg.data[5], recv_msg.data[6], recv_msg.data[7]);
+        // }
+
+        for (int i = 0; i < 10; i++) {
             ss = rt_device_read(dev, RT_WAITING_FOREVER, &recv_msg, 1);
             printf("read size:%d\n", ss);
 

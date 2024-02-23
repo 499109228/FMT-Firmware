@@ -105,8 +105,6 @@ void CAN2_RX0_IRQHandler(void)
     /* enter interrupt */
     rt_interrupt_enter();
 
-    printf("CAN2 RX IRQ\n");
-
     HAL_CAN_IRQHandler(&can2_data.hcan);
 
     /* leave interrupt */
@@ -355,7 +353,7 @@ static rt_err_t can_config(can_dev_t can, struct can_configure* cfg)
         can1_data.filter.FilterMaskIdLow      = 0x0000;
         can1_data.filter.FilterFIFOAssignment = CAN_RX_FIFO0;
         can1_data.filter.FilterActivation     = ENABLE;
-        can1_data.filter.SlaveStartFilterBank = 14;
+        can1_data.filter.SlaveStartFilterBank = 0;
         if (HAL_CAN_ConfigFilter(&can1_data.hcan, &can1_data.filter) != HAL_OK)
             return RT_ERROR;
 
@@ -380,7 +378,7 @@ static rt_err_t can_config(can_dev_t can, struct can_configure* cfg)
             return RT_ERROR;
 
         /* Configure the CAN filter */
-        can2_data.filter.FilterBank           = 0;
+        can2_data.filter.FilterBank           = 14;
         can2_data.filter.FilterMode           = CAN_FILTERMODE_IDMASK;
         can2_data.filter.FilterScale          = CAN_FILTERSCALE_32BIT;
         can2_data.filter.FilterIdHigh         = 0x0000;
