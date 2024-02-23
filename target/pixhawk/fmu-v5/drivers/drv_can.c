@@ -21,6 +21,8 @@
 #include "hal/can/can.h"
 #include "stm32f7xx_hal_can.h"
 
+#define CAN_DRV_DBG(...) printf(__VA_ARGS__)
+
 static rt_err_t can_config(can_dev_t can, struct can_configure* cfg);
 static rt_err_t can_control(can_dev_t can, int cmd, void* arg);
 static int      can_sendmsg(can_dev_t can, const can_msg_t msg);
@@ -114,14 +116,14 @@ void CAN2_RX0_IRQHandler(void)
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef* hcan)
 {
     if (hcan->Instance == CAN1) {
-        printf("can1 tx complete!\n");
+        CAN_DRV_DBG("can1 tx cplt\n");
         hal_can_notify(&can1_dev, CAN_EVENT_TX_DONE, RT_NULL);
     } else if (hcan->Instance == CAN2) {
-        printf("can2 tx complete!\n");
+        CAN_DRV_DBG("can2 tx cplt\n");
         hal_can_notify(&can2_dev, CAN_EVENT_TX_DONE, RT_NULL);
     } else {
         /* do nothing */
-        printf("canXXX tx complete!\n");
+        CAN_DRV_DBG("unknown can device cplt\n");
     }
 }
 
@@ -130,7 +132,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
     can_msg msg;
 
     if (hcan->Instance == CAN1) {
-        printf("can1 rx pending!\n");
+        CAN_DRV_DBG("can1 rx fifo pending\n");
 
         if (HAL_CAN_GetRxMessage(hcan, CAN_FILTER_FIFO0, &can1_data.rx_header, can1_data.rx_data) != HAL_OK)
             return;
@@ -144,7 +146,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
 
         hal_can_notify(&can1_dev, CAN_EVENT_RX_IND, &msg);
     } else if (hcan->Instance == CAN2) {
-        printf("can2 rx pending!\n");
+        CAN_DRV_DBG("can2 rx fifo pending\n");
 
         if (HAL_CAN_GetRxMessage(hcan, CAN_FILTER_FIFO0, &can2_data.rx_header, can2_data.rx_data) != HAL_OK)
             return;
@@ -158,7 +160,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef* hcan)
 
         hal_can_notify(&can2_dev, CAN_EVENT_RX_IND, &msg);
     } else {
-        printf("canXXX rx pending!\n");
+        CAN_DRV_DBG("unknown can device rx fifo pending\n");
     }
 }
 
@@ -166,12 +168,12 @@ void HAL_CAN_ErrorCallback(CAN_HandleTypeDef* hcan)
 {
     if (hcan->Instance == CAN1) {
         if (hcan->ErrorCode == HAL_CAN_ERROR_TX_ALST0 || hcan->ErrorCode == HAL_CAN_ERROR_TX_TERR0) {
-            printf("can1 tx error!\n");
+            CAN_DRV_DBG("can1 tx error!\n");
             hal_can_notify(&can1_dev, CAN_EVENT_TX_DONE, RT_NULL);
         }
     } else if (hcan->Instance == CAN2) {
         if (hcan->ErrorCode == HAL_CAN_ERROR_TX_ALST0 || hcan->ErrorCode == HAL_CAN_ERROR_TX_TERR0) {
-            printf("can2 tx error!\n");
+            CAN_DRV_DBG("can2 tx error!\n");
             hal_can_notify(&can2_dev, CAN_EVENT_TX_DONE, RT_NULL);
         }
     }
@@ -327,7 +329,7 @@ static rt_err_t can_config(can_dev_t can, struct can_configure* cfg)
     RT_ASSERT(cfg != RT_NULL);
 
     if (can == &can1_dev) {
-        /* Configure the CAN peripheral */
+        /* Configure the CAN1 peripheral, 1Mbps */
         can1_data.hcan.Instance                  = CAN1;
         can1_data.hcan.Init.Prescaler            = 6;
         can1_data.hcan.Init.Mode                 = CAN_MODE_NORMAL;
@@ -361,7 +363,7 @@ static rt_err_t can_config(can_dev_t can, struct can_configure* cfg)
         if (HAL_CAN_ActivateNotification(&can1_data.hcan, CAN_IT_TX_MAILBOX_EMPTY | CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
             return RT_ERROR;
     } else if (can == &can2_dev) {
-        /* Configure the CAN peripheral */
+        /* Configure the CAN2 peripheral, 1Mbps */
         can2_data.hcan.Instance                  = CAN2;
         can2_data.hcan.Init.Prescaler            = 6;
         can2_data.hcan.Init.Mode                 = CAN_MODE_NORMAL;
