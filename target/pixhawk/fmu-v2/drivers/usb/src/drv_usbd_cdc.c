@@ -26,13 +26,13 @@
 __ALIGN_BEGIN USB_OTG_CORE_HANDLE USB_OTG_dev __ALIGN_END;
 
 static struct usbd_cdc_dev usbd_dev = { 0 };
-static uint8_t rx_buffer[10 * RX_FIFO_FS_SIZE];
+static uint8_t             rx_buffer[10 * RX_FIFO_FS_SIZE];
 
 /**
-  * @brief  This function handles OTG_HS Handler.
-  * @param  None
-  * @retval None
-  */
+ * @brief  This function handles OTG_HS Handler.
+ * @param  None
+ * @retval None
+ */
 #ifdef USE_USB_OTG_HS
 void OTG_HS_IRQHandler(void)
 #else
@@ -50,10 +50,10 @@ void OTG_FS_IRQHandler(void)
 
 #ifdef USB_OTG_HS_DEDICATED_EP1_ENABLED
 /**
-  * @brief  This function handles EP1_IN Handler.
-  * @param  None
-  * @retval None
-  */
+ * @brief  This function handles EP1_IN Handler.
+ * @param  None
+ * @retval None
+ */
 void OTG_HS_EP1_IN_IRQHandler(void)
 {
     /* enter interrupt */
@@ -66,10 +66,10 @@ void OTG_HS_EP1_IN_IRQHandler(void)
 }
 
 /**
-  * @brief  This function handles EP1_OUT Handler.
-  * @param  None
-  * @retval None
-  */
+ * @brief  This function handles EP1_OUT Handler.
+ * @param  None
+ * @retval None
+ */
 void OTG_HS_EP1_OUT_IRQHandler(void)
 {
     /* enter interrupt */
@@ -115,8 +115,10 @@ static uint16_t drv_usbd_cdc_rx_cb(uint32_t Len)
         return 0;
     }
 
-    (void)ringbuffer_put(usbd_dev.rx_rb, rx_buffer, Len);
-    hal_usbd_cdc_notify_status(&usbd_dev, USBD_STATUS_RX);
+    if (ringbuffer_put(usbd_dev.rx_rb, rx_buffer, Len)) {
+        /* if data received and ringbuffer put success, notify upper layer */
+        hal_usbd_cdc_notify_status(&usbd_dev, USBD_STATUS_RX);
+    }
 
     return USBD_OK;
 }
@@ -137,9 +139,9 @@ void drv_usbd_cdc_disconnect_cb(void)
 }
 
 struct usbd_cdc_ops usbd_ops = {
-    .dev_init = NULL,
-    .dev_read = usbd_cdc_read,
-    .dev_write = usbd_cdc_write,
+    .dev_init    = NULL,
+    .dev_read    = usbd_cdc_read,
+    .dev_write   = usbd_cdc_write,
     .dev_control = NULL
 };
 

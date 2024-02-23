@@ -23,7 +23,7 @@
 #include "drv_usbd_int.h"
 
 static struct usbd_cdc_dev usbd_dev;
-usb_core_driver cdc_acm;
+usb_core_driver            cdc_acm;
 
 /*!
     \brief      this function handles USBFS wakeup interrupt handler
@@ -83,8 +83,8 @@ static rt_size_t usbd_cdc_read(usbd_cdc_dev_t usbd, rt_off_t pos, void* buf, rt_
 
 static rt_size_t usbd_cdc_write(usbd_cdc_dev_t usbd, rt_off_t pos, const void* buf, rt_size_t size)
 {
-    usb_cdc_handler* cdc = (usb_cdc_handler*)(&cdc_acm)->dev.class_data[CDC_COM_INTERFACE];
-    uint32_t tx_size = size > USB_TX_DATA_SIZE ? USB_TX_DATA_SIZE : size;
+    usb_cdc_handler* cdc     = (usb_cdc_handler*)(&cdc_acm)->dev.class_data[CDC_COM_INTERFACE];
+    uint32_t         tx_size = size > USB_TX_DATA_SIZE ? USB_TX_DATA_SIZE : size;
 
     rt_memcpy(cdc->tx_buffer, buf, tx_size);
     cdc->tx_length = tx_size;
@@ -118,9 +118,10 @@ void drv_usbd_cdc_receive(uint8_t* buffer, uint32_t size)
         return;
     }
 
-    (void)ringbuffer_put(usbd_dev.rx_rb, buffer, size);
-
-    hal_usbd_cdc_notify_status(&usbd_dev, USBD_STATUS_RX);
+    if (ringbuffer_put(usbd_dev.rx_rb, buffer, size)) {
+        /* if data received and ringbuffer put success, notify upper layer */
+        hal_usbd_cdc_notify_status(&usbd_dev, USBD_STATUS_RX);
+    }
 }
 
 void drv_usbd_cdc_transmist_complete(uint8_t* buffer, uint32_t size)
@@ -168,9 +169,9 @@ static void usb_intr_config(void)
 }
 
 struct usbd_cdc_ops usbd_ops = {
-    .dev_init = NULL,
-    .dev_read = usbd_cdc_read,
-    .dev_write = usbd_cdc_write,
+    .dev_init    = NULL,
+    .dev_read    = usbd_cdc_read,
+    .dev_write   = usbd_cdc_write,
     .dev_control = NULL
 };
 

@@ -72,8 +72,11 @@ void drv_usbd_cdc_receive(uint8_t* buffer, uint32_t size)
         /* usbd is not initialized */
         return;
     }
-    (void)ringbuffer_put(usbd_dev.rx_rb, buffer, size);
-    hal_usbd_cdc_notify_status(&usbd_dev, USBD_STATUS_RX);
+
+    if (ringbuffer_put(usbd_dev.rx_rb, buffer, size)) {
+        /* if data received and ringbuffer put success, notify upper layer */
+        hal_usbd_cdc_notify_status(&usbd_dev, USBD_STATUS_RX);
+    }
 }
 
 void drv_usbd_cdc_transmist_complete(uint8_t* buffer, uint32_t size)
@@ -82,9 +85,9 @@ void drv_usbd_cdc_transmist_complete(uint8_t* buffer, uint32_t size)
 }
 
 struct usbd_cdc_ops usbd_ops = {
-    .dev_init = NULL,
-    .dev_read = usbd_cdc_read,
-    .dev_write = usbd_cdc_write,
+    .dev_init    = NULL,
+    .dev_read    = usbd_cdc_read,
+    .dev_write   = usbd_cdc_write,
     .dev_control = NULL
 };
 
